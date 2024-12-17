@@ -11,8 +11,9 @@ import (
 func uploadFile(w http.ResponseWriter, r *http.Request) {
 	log.Print("File upload endpoint hit")
 
-	r.ParseMultipartForm(10 << 20)
-	tempFile, handler, err := r.FormFile("myFile")
+	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
+
+	tempFile, handler, err := r.FormFile("file")
 	if err != nil {
 		fmt.Println("Error retrieving file!")
 		fmt.Println(err)
