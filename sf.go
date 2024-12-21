@@ -6,33 +6,35 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 func uploadFile(w http.ResponseWriter, r *http.Request) {
-	log.Print("File upload endpoint hit")
+	log.Println("/upload/ hit")
 
 	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
 
-	tempFile, handler, err := r.FormFile("file")
+	clientFile, handler, err := r.FormFile("file")
 	if err != nil {
-		fmt.Println("Error retrieving file!")
-		fmt.Println(err)
+		log.Println(err)
+		http.Error(w, "Bad Request", 400)
 		return
 	}
-	defer tempFile.Close()
+	defer clientFile.Close()
 
-	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
-	fmt.Printf("File Size: %+v\n", handler.Size)
-	fmt.Printf("MIME Header: %+v\n", handler.Header)
+	log.Printf("Uploaded File: %+v\n", handler.Filename)
+	log.Printf("File Size: %+v\n", handler.Size)
 
-	fileBytes, err := io.ReadAll(tempFile)
+	fileBytes, err := io.ReadAll(clientFile)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
+		http.Error(w, "Internal Server Error", 500)
 	}
 
-	dst, err := os.Create("./uploads/" + handler.Filename)
+	dst, err := os.Create("./user-uploads/" + handler.Filename)
 	if err != nil {
-		fmt.Println("Error copying file:", err)
+		log.Println(err)
+		http.Error(w, "Internal Server Error", 500)
 		return
 	}
 	defer dst.Close()
@@ -40,16 +42,28 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	dst.Write(fileBytes)
 
 	fmt.Fprintf(w, "Successfully uploaded file\n")
-
 }
 
 func main() {
+	dirPath := filepath.Join(".", "user-uploads")
+	_, err := os.Stat(dirPath)
+	if os.IsNotExist(err) {
+		log.Println(err)
+
+		err = os.Mkdir(dirPath, 0755)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	log.Println("user-uploads dir created")
+
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
 	http.HandleFunc("/upload", uploadFile)
 
-	log.Print("Listening on :9090...")
-	err := http.ListenAndServe(":9090", nil)
+	log.Println("Listening on :9090...")
+	err = http.ListenAndServe(":9090", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
