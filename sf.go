@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 )
 
 type Data struct {
@@ -39,7 +38,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dst, err := os.Create("./user-uploads/" + handler.Filename)
+	dst, err := createFile("./user-uploads/" + handler.Filename)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Internal Server Error", 500)
@@ -62,7 +61,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("UUID:", uuidStr)
 
-	err = checkFile("./data.json")
+	err = checkIfPathExists("./data.json")
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Internal Server Error", 500)
@@ -140,50 +139,15 @@ func getSize(filePath string) int64 {
 	return fileInfo.Size()
 }
 
-func checkFile(filename string) error {
-	_, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		_, err := os.Create(filename)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func main() {
-	dirPath := filepath.Join(".", "user-uploads")
-	_, err := os.Stat(dirPath)
-	if os.IsNotExist(err) {
-		log.Println(err)
-
-		err = os.Mkdir(dirPath, 0755)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		log.Println("user-uploads dir created")
-	}
-
-	_, err = os.Stat("./data.json")
-	if os.IsNotExist(err) {
-		log.Println(err)
-
-		_, err := os.Create("./data.json")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		log.Println("data.json file created")
-	}
-
+	createFilesOnStartup()
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
 	http.HandleFunc("/upload", uploadFile)
 	http.HandleFunc("/download/", downloadFile)
 
 	log.Println("Listening on :9090...")
-	err = http.ListenAndServe(":9090", nil)
+	err := http.ListenAndServe(":9090", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
